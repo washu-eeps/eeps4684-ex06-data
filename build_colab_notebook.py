@@ -1,4 +1,4 @@
-"""Build the student Colab notebook using the unchanged CSV helper."""
+"""Build the student Colab notebook using the CSV conversion helper."""
 
 import json
 from pathlib import Path
@@ -46,8 +46,8 @@ def main() -> None:
         Colab runtime. This notebook does not request access to Google Drive.
 
         Before starting, export **m3c2.asc** and **c2c.asc** from CloudCompare:
-        choose ASCII cloud, comma separator, column-name header, and no
-        point-count header. Keep coordinates and scalar fields. Export the
+        choose ASCII cloud and include the column-name header. Comma, space, tab, or semicolon separators, spaces or underscores in field names, and an optional
+        point-count header are accepted. Keep coordinates and scalar fields. Export the
         M3C2 output cloud for the first file and the June cloud carrying
         C2C absolute distances for the second.
         """, "introduction"),
@@ -84,6 +84,7 @@ def main() -> None:
         """, "conversion-instructions"),
         cell("code", dedent("""
         import csv
+        import importlib.util
         import subprocess
         import sys
         import tempfile
@@ -97,15 +98,17 @@ def main() -> None:
         helper_path = output_folder / "normalize_export.py"
         """) + "\nhelper_path.write_text(" + repr(helper) + ", encoding='utf-8')\n\n" + dedent("""
         expected_fields = {
-            "m3c2.asc": ("M3C2 distance", "distance uncertainty", "significant change"),
-            "c2c.asc": ("C2C absolute distances",),
+            "m3c2.asc": ("M3C2_distance", "LoD95", "significant"),
+            "c2c.asc": ("C2C_distance",),
         }
+        spec = importlib.util.spec_from_file_location("export_helper", helper_path)
+        converter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(converter)
         converted_files = []
         for filename, expected in expected_fields.items():
             if filename not in uploaded or not Path(filename).is_file():
                 raise ValueError("Run step 1 and upload both exports first.")
-            with Path(filename).open(newline="") as stream:
-                header = next(csv.reader(stream), [])
+            header, rows, declared_count = converter.read_export(Path(filename))
             absent = [field for field in expected if field not in header]
             if absent:
                 raise ValueError(
@@ -119,8 +122,13 @@ def main() -> None:
             )
             if result.returncode:
                 raise RuntimeError(result.stderr.strip())
-            message = result.stdout.strip().split(" in ")[0]
-            print(output.name + ": " + message)
+            print(output.name + ": Preserved " + str(len(rows)) + " rows")
+            if declared_count is not None:
+                print("Validated optional point-count header: " + str(declared_count))
+            if filename == "c2c.asc" and len(rows) != 689560:
+                print("CHECK C2C DIRECTION: this exercise expects 689560 June points. "
+                      "Confirm June was the compared cloud and January the reference. "
+                      "All uploaded rows have been preserved.")
             converted_files.append(output)
 
         archive = output_folder / "exercise06_qgis_csvs.zip"

@@ -20,8 +20,10 @@ requested. The notebook contains no completed exercise results or lidar data.
 ## CloudCompare export settings
 
 Export the M3C2 output cloud as `m3c2.asc` and the June cloud carrying
-`C2C absolute distances` as `c2c.asc`. Choose ASCII cloud, a comma separator,
-a column-name header, no point-count header, and coordinates plus scalar fields.
+`C2C absolute distances` as `c2c.asc`. Choose ASCII cloud with a column-name header and coordinates plus scalar fields.
+The converter accepts comma, space, tab, or semicolon separators; field names
+with spaces or underscores; and an optional point-count header. That count is
+validated and is not treated as a data row. Missing values remain unchanged.
 Preserve the original survey coordinates when saving.
 
 If Save does nothing on macOS, open Display > Display settings, disable
