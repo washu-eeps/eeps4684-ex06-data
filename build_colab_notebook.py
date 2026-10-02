@@ -57,13 +57,29 @@ def main() -> None:
         Run the cell and click **Choose Files**. Select both **m3c2.asc** and
         **c2c.asc**, then wait for both uploads to finish. Do not upload the LAS
         files, the companion ZIP, or a Python script. If either filename is
-        different, rename your export before uploading.
+        different, rename your export before uploading. Colab copy suffixes such
+        as (1) are accepted automatically.
         """, "upload-instructions"),
-        cell("code", """
+        cell("code", r"""
         from google.colab import files
+        from pathlib import Path
+        import re
 
-        uploaded = files.upload()
+        received = files.upload()
+        uploaded = {}
         required_files = ("m3c2.asc", "c2c.asc")
+        for required in required_files:
+            stem = Path(required).stem
+            matches = [name for name in received if re.fullmatch(
+                re.escape(stem) + r"(?: \(\d+\))?\.asc", Path(name).name,
+                flags=re.IGNORECASE,
+            )]
+            if len(matches) > 1:
+                raise ValueError("Choose only one export for " + required + ".")
+            if matches:
+                uploaded[required] = received[matches[0]]
+                Path(required).write_bytes(uploaded[required])
+                print(matches[0] + " loaded as " + required)
         missing = [name for name in required_files if name not in uploaded]
         if missing:
             raise ValueError(
